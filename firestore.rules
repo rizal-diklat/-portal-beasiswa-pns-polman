@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isBootstrappedAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email == 'syahriarmuhrizal@gmail.com' && 
+             request.auth.token.email_verified == true;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) || isBootstrappedAdmin());
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Admins collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow create, update: if isBootstrappedAdmin() && isValidId(adminId);
+    }
+
+    // Scholarships
+    match /scholarships/{scholarshipId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(scholarshipId);
+      allow update: if isAdmin() && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'provider', 'accessInfo', 'scheduleStatus', 'callCenter', 'downloadLink', 'description', 'criteria'])
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Registrations
+    match /registrations/{registrationId} {
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      allow create: if isSignedIn() && 
+                      incoming().userId == request.auth.uid && 
+                      incoming().status == 'Pending' &&
+                      incoming().scholarshipId is string &&
+                      incoming().fullName is string &&
+                      incoming().fullName.size() <= 200;
+                      
+      allow update: if isAdmin() && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['status']);
+                      
+      allow delete: if isAdmin();
+    }
+  }
+}

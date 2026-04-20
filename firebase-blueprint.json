@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "scholarship": {
+      "title": "Scholarship",
+      "description": "Details about scholarships available for PNS",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "provider": { "type": "string" },
+        "accessInfo": { "type": "string" },
+        "scheduleStatus": { "type": "string", "enum": ["Buka", "Tutup", "Segera"] },
+        "callCenter": { "type": "string" },
+        "downloadLink": { "type": "string" },
+        "description": { "type": "string" },
+        "criteria": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "provider", "scheduleStatus", "description"]
+    },
+    "registration": {
+      "title": "Registration",
+      "description": "Scholarship application submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "scholarshipId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "fullName": { "type": "string" },
+        "nip": { "type": "string" },
+        "rank": { "type": "string" },
+        "office": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Disetujui", "Ditolak"] },
+        "submittedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["scholarshipId", "userId", "fullName", "nip", "rank", "office"]
+    }
+  },
+  "firestore": {
+    "/scholarships/{scholarshipId}": {
+      "schema": "scholarship",
+      "description": "Collection of scholarships"
+    },
+    "/registrations/{registrationId}": {
+      "schema": "registration",
+      "description": "Collection of scholarship applications"
+    },
+    "/admins/{adminId}": {
+      "schema": { "type": "object", "properties": { "email": { "type": "string" } } },
+      "description": "Authorized admin users"
+    }
+  }
+}
