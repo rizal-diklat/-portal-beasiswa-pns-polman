@@ -71,5 +71,13 @@ service cloud.firestore {
                       
       allow delete: if isAdmin();
     }
+
+    // Testimonials
+    match /testimonials/{testimonialId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(testimonialId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
   }
 }

@@ -23,7 +23,12 @@ import {
   ShieldCheck,
   FileText,
   BarChart3,
-  AlertCircle
+  AlertCircle,
+  Instagram,
+  Mail,
+  Play,
+  Quote,
+  Video
 } from 'lucide-react';
 import { 
   collection, 
@@ -67,19 +72,31 @@ interface Scholarship {
   createdAt: any;
 }
 
+interface Testimonial {
+  id: string;
+  name: string;
+  role: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+  createdAt: any;
+}
+
 // --- Components ---
 
 export default function App() {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [view, setView] = useState<'home' | 'guide' | 'admin'>('home');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [selectedScholarship, setSelectedScholarship] = useState<Scholarship | null>(null);
   const [isAddingScholarship, setIsAddingScholarship] = useState(false);
+  const [isAddingTestimonial, setIsAddingTestimonial] = useState(false);
   const [editingScholarship, setEditingScholarship] = useState<Scholarship | null>(null);
+  const [activeVideo, setActiveVideo] = useState<string | null>(null);
 
   // --- Auth & Data Fetching ---
 
@@ -116,6 +133,15 @@ export default function App() {
         return { id: doc.id, ...d, scheduleStatus: status } as Scholarship;
       });
       setScholarships(data);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'testimonials'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
+      setTestimonials(data);
     });
     return () => unsubscribe();
   }, []);
@@ -171,13 +197,36 @@ export default function App() {
     }
   };
 
+  const handleAddTestimonial = async (data: Partial<Testimonial>) => {
+    try {
+      await addDoc(collection(db, 'testimonials'), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+      setIsAddingTestimonial(false);
+    } catch (error) {
+      console.error("Add Testimonial Error", error);
+    }
+  };
+
+  const handleDeleteTestimonial = async (id: string) => {
+    if (window.confirm("Hapus testimoni ini?")) {
+      await deleteDoc(doc(db, 'testimonials', id));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-indigo-900 text-white border-b-4 border-amber-500 px-6 py-4 flex justify-between items-center shadow-md">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('home')}>
-          <div className="bg-white p-2 rounded-lg">
-            <GraduationCap className="text-indigo-900 w-6 h-6" />
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
+          <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-xl border border-white/20 shadow-inner transition-transform group-hover:scale-105">
+            <img 
+              src="/Lambang_Kabupaten_Polewali_Mandar.png" 
+              alt="Lambang Kabupaten Polewali Mandar" 
+              className="w-9 h-9 object-contain brightness-110"
+              referrerPolicy="no-referrer"
+            />
           </div>
           <div>
             <span className="text-xl font-bold tracking-tight block leading-none">THE BEST PNS</span>
@@ -251,17 +300,38 @@ export default function App() {
 
                 <div className="relative z-10 grid md:grid-cols-5 gap-8 items-center">
                   <div className="md:col-span-3 space-y-6">
-                    <div className="space-y-2">
-                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full text-amber-400 text-[10px] font-black uppercase tracking-[3px] border border-amber-500/30">
-                        Inovasi Digital BKPSDM
+                    <div className="space-y-6">
+                      <div className="space-y-4">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full text-amber-400 text-[10px] font-black uppercase tracking-[3px] border border-amber-500/30">
+                          Transformasi Digital BKPSDM
+                        </div>
+                        
+                        {/* Logo Slogan Instansi with Glassmorphism and Integration */}
+                        <div className="relative group">
+                          {/* Subtle Glow */}
+                          <div className="absolute inset-0 bg-amber-500/20 blur-3xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+                          
+                          <div className="relative bg-white/10 backdrop-blur-xl p-6 rounded-3xl shadow-2xl border border-white/10 inline-block overflow-hidden transition-all hover:bg-white/15">
+                            {/* Decorative light reflection */}
+                            <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent" />
+                            
+                            <img 
+                              src="/POLMAN LEBIH BAIK HITAM.png" 
+                              alt="POLMAN Lebih Baik" 
+                              className="h-16 md:h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)] transition-transform group-hover:scale-105 duration-500"
+                              referrerPolicy="no-referrer"
+                            />
+                          </div>
+                        </div>
                       </div>
+
                       <h1 className="text-4xl md:text-5xl font-black tracking-tighter leading-none">
                         THE BEST <span className="text-amber-500">PNS</span>
                       </h1>
                     </div>
                     
                     <p className="text-sm md:text-base text-indigo-100 leading-relaxed font-medium">
-                      <strong className="text-amber-400">THE BEST PNS</strong> adalah inovasi layanan digital Bidang Pendidikan dan Pelatihan <span className="underline decoration-amber-500/50 underline-offset-4">BKPSDM Kab. Polewali Mandar</span> yang akan menghimpun informasi beasiswa Pegawai Negeri Sipil dari berbagai penyedia beasiswa yang tersedia dalam satu platform. 
+                      <strong className="text-amber-400">THE BEST PNS</strong> adalah transformasi layanan digital Bidang Pendidikan dan Pelatihan <span className="underline decoration-amber-500/50 underline-offset-4">BKPSDM Kab. Polewali Mandar</span> yang akan menghimpun informasi beasiswa Pegawai Negeri Sipil dari berbagai penyedia beasiswa yang tersedia dalam satu platform. 
                     </p>
                     
                     <p className="text-xs md:text-sm text-indigo-200 leading-relaxed">
@@ -344,36 +414,47 @@ export default function App() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.05 }}
-                    className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:border-indigo-300 transition-all group"
+                    className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-indigo-300 transition-all group"
                   >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <h3 className="font-bold text-indigo-900 group-hover:text-indigo-600 transition-colors">{s.name}</h3>
-                        <p className="text-[11px] text-slate-500 font-medium italic">Oleh: {s.provider}</p>
+                    <div className="h-24 bg-slate-100 overflow-hidden relative">
+                       <img 
+                         src={`https://picsum.photos/seed/${s.id}-thumb/400/200`} 
+                         alt={s.name} 
+                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-90 mix-blend-multiply" 
+                         referrerPolicy="no-referrer"
+                       />
+                       <div className="absolute inset-0 bg-gradient-to-t from-white/80 to-transparent" />
+                    </div>
+                    <div className="p-5">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-bold text-indigo-900 group-hover:text-indigo-600 transition-colors">{s.name}</h3>
+                          <p className="text-[11px] text-slate-500 font-medium italic">Oleh: {s.provider}</p>
+                        </div>
+                        <span className={cn(
+                          "text-[9px] font-bold px-2 py-1 rounded uppercase",
+                          s.scheduleStatus === 'Buka' ? "bg-green-500 text-white" :
+                          s.scheduleStatus === 'Segera' ? "bg-indigo-400 text-white" :
+                          "bg-slate-400 text-white"
+                        )}>
+                          {s.scheduleStatus}
+                        </span>
                       </div>
-                      <span className={cn(
-                        "text-[9px] font-bold px-2 py-1 rounded uppercase",
-                        s.scheduleStatus === 'Buka' ? "bg-green-500 text-white" :
-                        s.scheduleStatus === 'Segera' ? "bg-indigo-400 text-white" :
-                        "bg-slate-400 text-white"
-                      )}>
-                        {s.scheduleStatus}
-                      </span>
-                    </div>
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {s.criteria.map(c => (
-                        <span key={c} className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded">#{c}</span>
-                      ))}
-                    </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {s.criteria.map(c => (
+                          <span key={c} className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded">#{c}</span>
+                        ))}
+                      </div>
 
-                    <div className="mt-4 flex gap-2">
-                       <button 
-                         onClick={() => setSelectedScholarship(s)}
-                         className="flex-1 bg-indigo-600 text-white py-2 rounded text-[11px] font-bold border border-indigo-700 hover:bg-indigo-700 transition-colors shadow-sm"
-                        >
-                         Lihat Detail & Link
-                       </button>
+                      <div className="mt-4 flex gap-2">
+                         <button 
+                           onClick={() => setSelectedScholarship(s)}
+                           className="flex-1 bg-indigo-600 text-white py-2 rounded text-[11px] font-bold border border-indigo-700 hover:bg-indigo-700 transition-colors shadow-sm"
+                          >
+                           Lihat Detail & Link
+                         </button>
+                      </div>
                     </div>
                   </motion.div>
                 ))}
@@ -408,14 +489,18 @@ export default function App() {
                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                 <h3 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">Hubungi Kami</h3>
                 <div className="space-y-3 text-[11px]">
-                  <div className="flex items-center gap-2 text-slate-600">
+                  <a href="https://wa.me/6285122409650" target="_blank" className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors">
                     <Phone className="w-3.5 h-3.5 text-indigo-600" />
-                    (021) 1234-5678
-                  </div>
-                  <div className="flex items-center gap-2 text-slate-600">
-                    <X className="w-3.5 h-3.5 text-indigo-600" />
-                    layanan@edupns.go.id
-                  </div>
+                    085122409650 (WhatsApp)
+                  </a>
+                  <a href="mailto:bidangdiklatpolman@gmail.com" className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors">
+                    <Mail className="w-3.5 h-3.5 text-indigo-600" />
+                    bidangdiklatpolman@gmail.com
+                  </a>
+                  <a href="https://instagram.com/diklatbkpsdm_polman" target="_blank" className="flex items-center gap-2 text-slate-600 hover:text-indigo-600 transition-colors">
+                    <Instagram className="w-3.5 h-3.5 text-indigo-600" />
+                    @diklatbkpsdm_polman
+                  </a>
                 </div>
               </div>
 
@@ -431,6 +516,68 @@ export default function App() {
                 </div>
               </div>
             </aside>
+
+            {/* Testimonials Section - Full Width */}
+            <section className="col-span-12 py-12">
+              <div className="flex flex-col items-center text-center space-y-4 mb-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-100 rounded-full text-indigo-700 text-[9px] font-bold uppercase tracking-widest">
+                  <Quote className="w-3 h-3" /> Testimoni Alumni
+                </div>
+                <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Sudah Banyak yang <span className="text-indigo-600">Terbantu</span></h2>
+                <div className="h-1 w-20 bg-amber-500 rounded-full" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {testimonials.map((t, idx) => (
+                  <motion.div
+                    key={t.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="bg-white rounded-2xl overflow-hidden shadow-xl border border-slate-100 group relative"
+                  >
+                    <div className="aspect-video relative overflow-hidden bg-slate-900">
+                      <img 
+                        src={t.thumbnailUrl || `https://picsum.photos/seed/${t.id}/800/450`} 
+                        alt={t.name}
+                        className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700"
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-60" />
+                      
+                      <button 
+                        onClick={() => setActiveVideo(t.videoUrl)}
+                        className="absolute inset-0 flex items-center justify-center group/btn"
+                      >
+                        <div className="w-14 h-14 bg-amber-500 text-slate-900 rounded-full flex items-center justify-center shadow-2xl transition-all group-hover/btn:scale-125 group-hover/btn:bg-white">
+                          <Play className="w-6 h-6 fill-current" />
+                        </div>
+                      </button>
+                    </div>
+
+                    <div className="p-6">
+                      <h4 className="font-bold text-slate-800 text-sm italic">"{t.role}"</h4>
+                      <div className="mt-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-600 text-xs">
+                          {t.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div>
+                          <p className="text-xs font-black text-slate-900 uppercase tracking-wider">{t.name}</p>
+                          <p className="text-[10px] text-slate-500">Penerima Beasiswa</p>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+                
+                {testimonials.length === 0 && (
+                  <div className="col-span-full py-12 text-center bg-indigo-50/50 rounded-3xl border-2 border-dashed border-indigo-100">
+                    <Video className="w-12 h-12 text-indigo-200 mx-auto mb-4" />
+                    <p className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Belum ada testimoni video</p>
+                  </div>
+                )}
+              </div>
+            </section>
           </>
         )}
 
@@ -520,6 +667,38 @@ export default function App() {
                    </tbody>
                  </table>
             </div>
+
+            {/* Manage Testimonials Section */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-indigo-900 border-l-4 border-amber-500 pl-3 uppercase">Testimoni Video</h3>
+                <button 
+                  onClick={() => setIsAddingTestimonial(true)}
+                  className="bg-slate-900 text-white px-6 py-2 rounded font-bold text-[10px] uppercase tracking-widest hover:bg-slate-700 transition-colors flex items-center gap-2"
+                >
+                  <Video className="w-4 h-4" /> Tambah Video
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {testimonials.map(t => (
+                  <div key={t.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden relative">
+                       <img src={t.thumbnailUrl || `https://picsum.photos/seed/${t.id}/400/225`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                       <div className="absolute top-2 right-2 flex gap-1">
+                          <button onClick={() => handleDeleteTestimonial(t.id)} className="p-1.5 bg-rose-500 text-white rounded hover:bg-rose-600">
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                       </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-800 uppercase line-clamp-1">{t.name}</p>
+                      <p className="text-[10px] text-slate-500 italic">{t.role}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </section>
         )}
       </main>
@@ -555,7 +734,7 @@ export default function App() {
                className="relative bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] border-t-8 border-indigo-900"
              >
                 <div className="relative h-48 sm:h-64 shrink-0 bg-slate-100">
-                  <img src="https://picsum.photos/seed/detail/800/600" className="w-full h-full object-cover mix-blend-multiply opacity-80" referrerPolicy="no-referrer" />
+                  <img src={`https://picsum.photos/seed/${selectedScholarship.id}-detail/800/600`} className="w-full h-full object-cover mix-blend-multiply opacity-80" referrerPolicy="no-referrer" />
                   <button 
                     onClick={() => setSelectedScholarship(null)}
                     className="absolute top-4 right-4 bg-indigo-900/60 hover:bg-indigo-950 text-white p-2 rounded transition-all"
@@ -650,7 +829,72 @@ export default function App() {
           </div>
         )}
 
-        {/* Add/Edit Scholarship Modal */}
+        {/* Video Player Modal */}
+        {activeVideo && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-10">
+             <motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="absolute inset-0 bg-black/90 backdrop-blur-xl" 
+               onClick={() => setActiveVideo(null)} 
+             />
+             <motion.div 
+               initial={{ scale: 0.9, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               exit={{ scale: 0.9, opacity: 0 }}
+               className="relative w-full max-w-4xl aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl"
+             >
+                <button 
+                  onClick={() => setActiveVideo(null)}
+                  className="absolute top-4 right-4 z-10 bg-white/10 hover:bg-white/20 text-white p-2 rounded-full transition-all"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+                <iframe 
+                  src={activeVideo.includes('youtube.com') || activeVideo.includes('youtu.be') 
+                    ? `https://www.youtube.com/embed/${activeVideo.split('/').pop()?.split('?')[0].split('&')[0]}` 
+                    : activeVideo} 
+                  className="w-full h-full"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                  allowFullScreen 
+                />
+             </motion.div>
+          </div>
+        )}
+
+        {/* Add Testimonial Modal */}
+        {isAddingTestimonial && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
+            <motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="absolute inset-0 bg-[#1A1A1A]/95" 
+               onClick={() => setIsAddingTestimonial(false)} 
+             />
+              <motion.div 
+               initial={{ y: 50, opacity: 0 }}
+               animate={{ y: 0, opacity: 1 }}
+               exit={{ y: 50, opacity: 0 }}
+               className="relative bg-white w-full max-w-md rounded-xl p-8 border-t-8 border-indigo-900"
+               onClick={(e) => e.stopPropagation()}
+             >
+               <h2 className="text-xl font-bold uppercase tracking-tight text-indigo-900 mb-8">Tambah Testimoni Video</h2>
+               <form onSubmit={(e) => {
+                 e.preventDefault();
+                 const formData = new FormData(e.currentTarget);
+                 handleAddTestimonial(Object.fromEntries(formData));
+               }} className="space-y-4">
+                 <input name="name" placeholder="Nama Alumni" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
+                 <input name="role" placeholder="Angkatan / Jabatan / Pesan Singkat" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
+                 <input name="videoUrl" placeholder="Link Video (YouTube/Direct)" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
+                 <input name="thumbnailUrl" placeholder="Link Thumbnail (Opsional)" className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
+                 <button type="submit" className="w-full bg-indigo-900 text-white py-4 rounded font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">Simpan Testimoni</button>
+               </form>
+             </motion.div>
+          </div>
+        )}
         {(isAddingScholarship || editingScholarship) && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
             <motion.div 

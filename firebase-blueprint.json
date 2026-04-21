@@ -36,6 +36,20 @@
         "submittedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["scholarshipId", "userId", "fullName", "nip", "rank", "office"]
+    },
+    "testimonial": {
+      "title": "Testimonial",
+      "description": "Video testimonial from scholarship alumni",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "videoUrl": { "type": "string" },
+        "thumbnailUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "role", "videoUrl"]
     }
   },
   "firestore": {
@@ -46,6 +60,10 @@
     "/registrations/{registrationId}": {
       "schema": "registration",
       "description": "Collection of scholarship applications"
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": "testimonial",
+      "description": "Collection of video testimonials"
     },
     "/admins/{adminId}": {
       "schema": { "type": "object", "properties": { "email": { "type": "string" } } },
