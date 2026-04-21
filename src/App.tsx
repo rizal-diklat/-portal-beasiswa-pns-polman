@@ -180,8 +180,8 @@ export default function App() {
             <GraduationCap className="text-indigo-900 w-6 h-6" />
           </div>
           <div>
-            <span className="text-xl font-bold tracking-tight block leading-none">PORTAL BEASISWA PNS</span>
-            <span className="text-[10px] text-indigo-200 font-medium uppercase tracking-wider">Peningkatan Kapasitas SDM Aparatur</span>
+            <span className="text-xl font-bold tracking-tight block leading-none">THE BEST PNS</span>
+            <span className="text-[10px] text-indigo-200 font-medium uppercase tracking-wider">Portal Beasiswa PNS</span>
           </div>
         </div>
         
@@ -238,6 +238,53 @@ export default function App() {
         
         {view === 'home' && (
           <>
+            {/* Hero Section / About */}
+            <header className="col-span-12">
+              <motion.div 
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-indigo-900 rounded-3xl p-8 md:p-12 text-white relative overflow-hidden shadow-2xl border-b-8 border-amber-500"
+              >
+                {/* Abstract Background Decoration */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-20 -mt-20 blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-amber-500/10 rounded-full -ml-10 -mb-10 blur-2xl" />
+
+                <div className="relative z-10 grid md:grid-cols-5 gap-8 items-center">
+                  <div className="md:col-span-3 space-y-6">
+                    <div className="space-y-2">
+                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/20 rounded-full text-amber-400 text-[10px] font-black uppercase tracking-[3px] border border-amber-500/30">
+                        Inovasi Digital BKPSDM
+                      </div>
+                      <h1 className="text-4xl md:text-5xl font-black tracking-tighter leading-none">
+                        THE BEST <span className="text-amber-500">PNS</span>
+                      </h1>
+                    </div>
+                    
+                    <p className="text-sm md:text-base text-indigo-100 leading-relaxed font-medium">
+                      <strong className="text-amber-400">THE BEST PNS</strong> adalah inovasi layanan digital Bidang Pendidikan dan Pelatihan <span className="underline decoration-amber-500/50 underline-offset-4">BKPSDM Kab. Polewali Mandar</span> yang akan menghimpun informasi beasiswa Pegawai Negeri Sipil dari berbagai penyedia beasiswa yang tersedia dalam satu platform. 
+                    </p>
+                    
+                    <p className="text-xs md:text-sm text-indigo-200 leading-relaxed">
+                      Layanan ini bertujuan untuk memberikan kemudahan bagi Pegawai Negeri Sipil dalam mengakses informasi beasiswa dengan cepat, sederhana, dan terintegrasi guna mendukung dan memperkuat pengembangan kompetensi Pegawai Negeri Sipil sejalan dengan <strong className="text-white italic">Asta Cita Presiden dan Wakil Presiden menuju Indonesia Emas</strong>.
+                    </p>
+                  </div>
+                  
+                  <div className="md:col-span-2 flex justify-center md:justify-end">
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-amber-500 blur-2xl opacity-20" />
+                      <div className="bg-white/10 backdrop-blur-md p-8 rounded-2xl border border-white/20 rotate-3 hover:rotate-0 transition-transform duration-500">
+                        <GraduationCap className="w-24 h-24 text-amber-500" strokeWidth={1.5} />
+                        <div className="mt-4 text-center">
+                          <p className="text-[10px] font-black uppercase tracking-[2px]">SDM Unggul</p>
+                          <p className="text-[10px] text-amber-400 font-medium">Indonesia Maju</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </header>
+
             {/* Sidebar Left: Search & Filter */}
             <aside className="col-span-12 md:col-span-3 space-y-4">
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
