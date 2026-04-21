@@ -280,6 +280,17 @@ export default function App() {
     }
   };
 
+  const getDirectLink = (url: string) => {
+    if (!url) return url;
+    if (url.includes('drive.google.com')) {
+      const driveMatch = url.match(/\/file\/d\/([^/]+)/) || url.match(/id=([^&]+)/);
+      if (driveMatch && driveMatch[1]) {
+        return `https://lh3.googleusercontent.com/u/0/d/${driveMatch[1]}=w1000-h1000`;
+      }
+    }
+    return url;
+  };
+
   const handleAddTestimonial = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setUploading(true);
@@ -288,15 +299,43 @@ export default function App() {
       const name = formData.get('name') as string;
       const role = formData.get('role') as string;
       const videoUrl = formData.get('videoUrl') as string;
-      const thumbnailFile = formData.get('thumbnailFile') as File;
+      const thumbnailFile = formData.get('thumbnailFile') as File | null;
       let thumbnailUrl = formData.get('thumbnailUrl') as string;
 
-      if (thumbnailFile && thumbnailFile.name) {
-        const storageRef = ref(storage, `testimonials/${Date.now()}_${thumbnailFile.name}`);
-        const snapshot = await uploadBytes(storageRef, thumbnailFile);
-        thumbnailUrl = await getDownloadURL(snapshot.ref);
+      console.log("Memulai proses simpan testimoni...", { name, role });
+
+      // Konversi link Google Drive jika diisi via URL
+      if (thumbnailUrl && thumbnailUrl.includes('drive.google.com')) {
+        thumbnailUrl = getDirectLink(thumbnailUrl);
       }
 
+      // Validasi file jika ada
+      if (thumbnailFile && thumbnailFile.name && thumbnailFile.size > 0) {
+        console.log("File terdeteksi:", thumbnailFile.name, thumbnailFile.size);
+        
+        if (thumbnailFile.size > 5 * 1024 * 1024) {
+          throw new Error("Ukuran file terlalu besar! Maksimal 5MB.");
+        }
+
+        try {
+          const storageRef = ref(storage, `testimonials/${Date.now()}_${thumbnailFile.name.replace(/\s+/g, '_')}`);
+          console.log("Mengunggah ke Storage...");
+          const snapshot = await uploadBytes(storageRef, thumbnailFile);
+          thumbnailUrl = await getDownloadURL(snapshot.ref);
+          console.log("Unggah berhasil! URL:", thumbnailUrl);
+        } catch (storageErr: any) {
+          console.error("Storage Error:", storageErr);
+          // Jika gagal upload, beri pilihan untuk lanjut tanpa foto custom atau stop
+          if (window.confirm("Gagal mengunggah foto ke Storage. Ingin tetap menyimpan testimoni dengan foto default?")) {
+            thumbnailUrl = ""; // Akan memicu fallback picsum
+          } else {
+            setUploading(false);
+            return;
+          }
+        }
+      }
+
+      console.log("Menyimpan ke Firestore...");
       await addDoc(collection(db, 'testimonials'), {
         name,
         role,
@@ -304,10 +343,12 @@ export default function App() {
         thumbnailUrl: thumbnailUrl || `https://picsum.photos/seed/${Date.now()}/800/450`,
         createdAt: serverTimestamp(),
       });
+      
+      console.log("Testimoni berhasil disimpan.");
       setIsAddingTestimonial(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Add Testimonial Error", error);
-      alert("Gagal mengupload foto. Pastikan ukuran file tidak terlalu besar.");
+      alert(error.message || "Gagal menyimpan testimoni. Silakan coba lagi.");
     } finally {
       setUploading(false);
     }
@@ -729,7 +770,7 @@ export default function App() {
                   >
                     <div className="aspect-video relative overflow-hidden bg-slate-900">
                       <img 
-                        src={t.thumbnailUrl || `https://picsum.photos/seed/${t.id}/800/450`} 
+                        src={getDirectLink(t.thumbnailUrl) || `https://picsum.photos/seed/${t.id}/800/450`} 
                         alt={t.name}
                         className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-700"
                         referrerPolicy="no-referrer"
