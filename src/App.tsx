@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, FormEvent } from 'react';
 import { 
   Search, 
   User, 
@@ -28,7 +28,12 @@ import {
   Mail,
   Play,
   Quote,
-  Video
+  Video,
+  Bell,
+  Megaphone,
+  Image as ImageIcon,
+  Upload,
+  Loader2
 } from 'lucide-react';
 import { 
   collection, 
@@ -47,6 +52,11 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { 
+  ref, 
+  uploadBytes, 
+  getDownloadURL 
+} from 'firebase/storage';
+import { 
   signInWithPopup, 
   GoogleAuthProvider, 
   onAuthStateChanged, 
@@ -54,7 +64,7 @@ import {
   User as FirebaseUser 
 } from 'firebase/auth';
 import { motion, AnimatePresence } from 'motion/react';
-import { db, auth } from './lib/firebase';
+import { db, auth, storage } from './lib/firebase';
 import { cn } from './lib/utils';
 
 // --- Types ---
@@ -81,6 +91,20 @@ interface Testimonial {
   createdAt: any;
 }
 
+interface Announcement {
+  id: string;
+  content: string;
+  type: 'Penting' | 'Berita' | 'Update';
+  createdAt: any;
+}
+
+interface QuickInfo {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: any;
+}
+
 // --- Components ---
 
 export default function App() {
@@ -88,6 +112,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [scholarships, setScholarships] = useState<Scholarship[]>([]);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('All');
   const [view, setView] = useState<'home' | 'guide' | 'admin'>('home');
@@ -97,6 +122,11 @@ export default function App() {
   const [isAddingTestimonial, setIsAddingTestimonial] = useState(false);
   const [editingScholarship, setEditingScholarship] = useState<Scholarship | null>(null);
   const [activeVideo, setActiveVideo] = useState<string | null>(null);
+  const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [quickInfos, setQuickInfos] = useState<QuickInfo[]>([]);
+  const [isAddingQuickInfo, setIsAddingQuickInfo] = useState(false);
+  const [editingQuickInfo, setEditingQuickInfo] = useState<QuickInfo | null>(null);
 
   // --- Auth & Data Fetching ---
 
@@ -106,11 +136,20 @@ export default function App() {
       if (user) {
         // Auto-promote specific user to admin for testing
         if (user.email === 'syahriarmuhrizal@gmail.com') {
-          await setDoc(doc(db, 'admins', user.uid), { email: user.email });
+          try {
+            await setDoc(doc(db, 'admins', user.uid), { email: user.email });
+          } catch (e) {
+            console.warn("Bootstrap Admin Set Error (expected if not verified):", e);
+          }
         }
         
-        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-        setIsAdmin(adminDoc.exists());
+        try {
+          const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+          setIsAdmin(adminDoc.exists());
+        } catch (error) {
+          console.error("Admin Check Error:", error);
+          setIsAdmin(false);
+        }
       } else {
         setIsAdmin(false);
       }
@@ -133,6 +172,8 @@ export default function App() {
         return { id: doc.id, ...d, scheduleStatus: status } as Scholarship;
       });
       setScholarships(data);
+    }, (error) => {
+      console.error("Scholarships Snapshot Error:", error);
     });
     return () => unsubscribe();
   }, []);
@@ -142,6 +183,30 @@ export default function App() {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Testimonial));
       setTestimonials(data);
+    }, (error) => {
+      console.error("Testimonials Snapshot Error:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Announcement));
+      setAnnouncements(data);
+    }, (error) => {
+      console.error("Announcements Snapshot Error:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const q = query(collection(db, 'quickInfos'), orderBy('createdAt', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuickInfo));
+      setQuickInfos(data);
+    }, (error) => {
+      console.error("QuickInfos Snapshot Error:", error);
     });
     return () => unsubscribe();
   }, []);
@@ -197,21 +262,87 @@ export default function App() {
     }
   };
 
-  const handleAddTestimonial = async (data: Partial<Testimonial>) => {
+  const handleAddTestimonial = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setUploading(true);
     try {
+      const formData = new FormData(e.currentTarget);
+      const name = formData.get('name') as string;
+      const role = formData.get('role') as string;
+      const videoUrl = formData.get('videoUrl') as string;
+      const thumbnailFile = formData.get('thumbnailFile') as File;
+      let thumbnailUrl = formData.get('thumbnailUrl') as string;
+
+      if (thumbnailFile && thumbnailFile.name) {
+        const storageRef = ref(storage, `testimonials/${Date.now()}_${thumbnailFile.name}`);
+        const snapshot = await uploadBytes(storageRef, thumbnailFile);
+        thumbnailUrl = await getDownloadURL(snapshot.ref);
+      }
+
       await addDoc(collection(db, 'testimonials'), {
-        ...data,
+        name,
+        role,
+        videoUrl,
+        thumbnailUrl: thumbnailUrl || `https://picsum.photos/seed/${Date.now()}/800/450`,
         createdAt: serverTimestamp(),
       });
       setIsAddingTestimonial(false);
     } catch (error) {
       console.error("Add Testimonial Error", error);
+      alert("Gagal mengupload foto. Pastikan ukuran file tidak terlalu besar.");
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleDeleteTestimonial = async (id: string) => {
     if (window.confirm("Hapus testimoni ini?")) {
       await deleteDoc(doc(db, 'testimonials', id));
+    }
+  };
+
+  const handleAddAnnouncement = async (data: Partial<Announcement>) => {
+    try {
+      await addDoc(collection(db, 'announcements'), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+      setIsAddingAnnouncement(false);
+    } catch (error) {
+      console.error("Add Announcement Error", error);
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (window.confirm("Hapus informasi ini?")) {
+      await deleteDoc(doc(db, 'announcements', id));
+    }
+  };
+
+  const handleAddQuickInfo = async (data: Partial<QuickInfo>) => {
+    try {
+      await addDoc(collection(db, 'quickInfos'), {
+        ...data,
+        createdAt: serverTimestamp(),
+      });
+      setIsAddingQuickInfo(false);
+    } catch (error) {
+      console.error("Add Quick Info Error", error);
+    }
+  };
+
+  const handleUpdateQuickInfo = async (id: string, data: Partial<QuickInfo>) => {
+    try {
+      await updateDoc(doc(db, 'quickInfos', id), data);
+      setEditingQuickInfo(null);
+    } catch (error) {
+      console.error("Update Quick Info Error", error);
+    }
+  };
+
+  const handleDeleteQuickInfo = async (id: string) => {
+    if (window.confirm("Hapus kartu informasi ini?")) {
+      await deleteDoc(doc(db, 'quickInfos', id));
     }
   };
 
@@ -278,6 +409,34 @@ export default function App() {
           )}
         </div>
       </nav>
+
+      {/* Announcements Marquee */}
+      {announcements.length > 0 && (
+        <div className="bg-amber-500 text-slate-900 py-2 border-y border-amber-600">
+           <div className="max-w-[1024px] mx-auto px-6 overflow-hidden flex items-center gap-4">
+              <div className="flex items-center gap-2 bg-indigo-900 text-white px-2 py-0.5 rounded text-[9px] font-black uppercase shrink-0">
+                <Bell className="w-3 h-3" /> Info Terbaru
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <div className="animate-marquee whitespace-nowrap flex gap-12 py-1">
+                   {/* Combined list for seamless loop */}
+                   {[...announcements, ...announcements].map((a, idx) => (
+                     <span key={`${a.id}-${idx}`} className="text-[10px] font-black uppercase tracking-wider flex items-center gap-2">
+                       <span className={cn(
+                          "px-1.5 py-0.5 rounded text-[8px] text-white shadow-sm",
+                          a.type === 'Penting' ? "bg-rose-600" :
+                          a.type === 'Berita' ? "bg-indigo-600" : "bg-slate-700"
+                       )}>
+                         {a.type}
+                       </span>
+                       {a.content}
+                     </span>
+                   ))}
+                </div>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main className={cn(
@@ -475,14 +634,21 @@ export default function App() {
                   <h3 className="text-xs font-bold uppercase tracking-wider">Informasi Baru</h3>
                 </div>
                 <div className="p-4 space-y-4">
-                  <div className="border-b border-slate-100 pb-3">
-                    <span className="text-[9px] text-amber-600 font-bold block uppercase mb-1">Berlian Pendidikan</span>
-                    <p className="text-[10px] leading-relaxed text-slate-600">Pastikan berkas digital Anda siap dalam format PDF maksimal 2MB.</p>
-                  </div>
-                  <div className="pb-1">
-                    <span className="text-[9px] text-slate-400 font-bold block uppercase mb-1">Panduan Pengguna</span>
-                    <p className="text-[10px] leading-relaxed text-slate-600">Pelajari tata cara pendaftaran pada menu Panduan di atas.</p>
-                  </div>
+                  {quickInfos.length > 0 ? (
+                    quickInfos.map((info, idx) => (
+                      <div key={info.id} className={cn(idx !== quickInfos.length - 1 && "border-b border-slate-100 pb-3")}>
+                        <span className={cn(
+                          "text-[9px] font-bold block uppercase mb-1",
+                          idx === 0 ? "text-amber-600" : "text-slate-400"
+                        )}>{info.title}</span>
+                        <p className="text-[10px] leading-relaxed text-slate-600">{info.content}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-4 text-center">
+                       <p className="text-[9px] text-slate-400 uppercase italic">Belum ada informasi</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -699,18 +865,139 @@ export default function App() {
                 ))}
               </div>
             </div>
+
+            {/* Manage Announcements Section */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-indigo-900 border-l-4 border-amber-500 pl-3 uppercase">Informasi Terbaru (Berita)</h3>
+                <button 
+                  onClick={() => setIsAddingAnnouncement(true)}
+                  className="bg-indigo-600 text-white px-6 py-2 rounded font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-colors flex items-center gap-2"
+                >
+                  <Megaphone className="w-4 h-4" /> Tambah Berita
+                </button>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">
+                      <th className="px-8 py-4">Konten</th>
+                      <th className="px-8 py-4">Tipe</th>
+                      <th className="px-8 py-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {announcements.map(a => (
+                      <tr key={a.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                        <td className="px-8 py-4 text-xs font-medium text-slate-700">{a.content}</td>
+                        <td className="px-8 py-4">
+                           <span className={cn(
+                             "text-[8px] font-black uppercase px-2 py-0.5 rounded text-white",
+                             a.type === 'Penting' ? "bg-rose-600" :
+                             a.type === 'Berita' ? "bg-indigo-600" : "bg-slate-700"
+                           )}>
+                             {a.type}
+                           </span>
+                        </td>
+                        <td className="px-8 py-4 text-right">
+                          <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-rose-600 hover:scale-110 transition-transform">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Manage Quick Infos Section */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-lg font-bold text-indigo-900 border-l-4 border-amber-500 pl-3 uppercase">Konten Kartu Informasi (Informasi Baru)</h3>
+                <button 
+                  onClick={() => setIsAddingQuickInfo(true)}
+                  className="bg-amber-500 text-slate-900 px-6 py-2 rounded font-bold text-[10px] uppercase tracking-widest hover:bg-amber-600 transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Tambah Kartu
+                </button>
+              </div>
+
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-left">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-slate-50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-200">
+                      <th className="px-8 py-4">Judul</th>
+                      <th className="px-8 py-4">Konten</th>
+                      <th className="px-8 py-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quickInfos.map(info => (
+                      <tr key={info.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50">
+                        <td className="px-8 py-4 text-xs font-bold text-indigo-900 uppercase tracking-tight">{info.title}</td>
+                        <td className="px-8 py-4 text-[10px] text-slate-600 leading-relaxed max-w-xs">{info.content}</td>
+                        <td className="px-8 py-4 text-right space-x-1 whitespace-nowrap">
+                          <button onClick={() => setEditingQuickInfo(info)} className="p-2 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"><Edit3 className="w-4 h-4" /></button>
+                          <button onClick={() => handleDeleteQuickInfo(info.id)} className="p-2 text-rose-600 hover:bg-rose-50 rounded transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        </td>
+                      </tr>
+                    ))}
+                    {quickInfos.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-8 py-12 text-center text-[10px] text-slate-400 font-bold uppercase">Belum ada kartu informasi</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </section>
         )}
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 px-6">
-        <div className="max-w-[1024px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-           <div>&copy; 2026 Portal Beasiswa PNS. Sistem Terintegrasi Nasional.</div>
-           <div className="flex gap-6">
-             <span className="flex items-center gap-2">Status: <strong className="text-green-600">Normal</strong></span>
-             <span className="flex items-center gap-2">Internal: <strong className="text-indigo-600">EduPNS v1.0</strong></span>
-           </div>
+      <footer className="bg-white/50 backdrop-blur-sm border-t border-slate-200 py-6 px-6 mt-16">
+        <div className="max-w-[1024px] mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+            {/* Column 1: Ownership */}
+            <div className="order-2 md:order-1 flex items-center justify-center md:justify-start gap-4">
+              <div className="p-2.5 bg-indigo-900 rounded-xl shadow-lg ring-4 ring-indigo-50">
+                 <ShieldCheck className="w-4 h-4 text-amber-500" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[10px] font-black text-slate-900 uppercase tracking-[2px] leading-none mb-1">&copy; 2026</p>
+                <p className="text-[9px] font-bold text-amber-600 uppercase tracking-[2px] italic">Produk Aktualisasi LATSAR</p>
+              </div>
+            </div>
+
+            {/* Column 2: Platform Identity */}
+            <div className="order-1 md:order-2 text-center">
+              <div className="relative inline-block group">
+                 <div className="absolute -inset-1 bg-gradient-to-r from-amber-500 to-indigo-600 rounded-lg blur opacity-10 group-hover:opacity-25 transition duration-1000"></div>
+                 <div className="relative px-6 py-2 bg-white border border-slate-200 rounded-xl shadow-sm">
+                   <p className="text-[11px] font-black text-indigo-950 uppercase tracking-[4px]">Portal Beasiswa PNS Terintegrasi</p>
+                 </div>
+              </div>
+            </div>
+
+            {/* Column 3: Operational Unit */}
+            <div className="order-3 flex items-center justify-center md:justify-end gap-3">
+              <div className="text-center md:text-right">
+                <p className="text-[10px] font-black text-indigo-900 uppercase tracking-[1px]">Bidang Diklat BKPSDM</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter leading-tight mt-0.5">
+                  Pemerintah Kabupaten <br className="hidden md:block" /> Polewali Mandar
+                </p>
+              </div>
+              <img 
+                src="/Lambang_Kabupaten_Polewali_Mandar.png" 
+                alt="Logo Pemkab Polewali Mandar" 
+                className="w-10 h-auto grayscale hover:grayscale-0 transition-all duration-500"
+                referrerPolicy="no-referrer"
+              />
+            </div>
+          </div>
         </div>
       </footer>
 
@@ -852,9 +1139,20 @@ export default function App() {
                   <X className="w-6 h-6" />
                 </button>
                 <iframe 
-                  src={activeVideo.includes('youtube.com') || activeVideo.includes('youtu.be') 
-                    ? `https://www.youtube.com/embed/${activeVideo.split('/').pop()?.split('?')[0].split('&')[0]}` 
-                    : activeVideo} 
+                  src={(() => {
+                    const url = activeVideo;
+                    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                      const videoId = url.split('/').pop()?.split('?')[0].split('&')[0];
+                      return `https://www.youtube.com/embed/${videoId}`;
+                    }
+                    if (url.includes('drive.google.com')) {
+                      const driveMatch = url.match(/\/file\/d\/([^/]+)/) || url.match(/id=([^&]+)/);
+                      if (driveMatch && driveMatch[1]) {
+                        return `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+                      }
+                    }
+                    return url;
+                  })()} 
                   className="w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                   allowFullScreen 
@@ -881,20 +1179,100 @@ export default function App() {
                onClick={(e) => e.stopPropagation()}
              >
                <h2 className="text-xl font-bold uppercase tracking-tight text-indigo-900 mb-8">Tambah Testimoni Video</h2>
-               <form onSubmit={(e) => {
-                 e.preventDefault();
-                 const formData = new FormData(e.currentTarget);
-                 handleAddTestimonial(Object.fromEntries(formData));
-               }} className="space-y-4">
+               <form onSubmit={handleAddTestimonial} className="space-y-4">
                  <input name="name" placeholder="Nama Alumni" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
                  <input name="role" placeholder="Angkatan / Jabatan / Pesan Singkat" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
                  <input name="videoUrl" placeholder="Link Video (YouTube/Direct)" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
-                 <input name="thumbnailUrl" placeholder="Link Thumbnail (Opsional)" className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
-                 <button type="submit" className="w-full bg-indigo-900 text-white py-4 rounded font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">Simpan Testimoni</button>
+                 
+                 <div className="space-y-2">
+                   <p className="text-[10px] font-black text-slate-400 uppercase ml-1">Foto Penerima Beasiswa</p>
+                   <div className="flex gap-2">
+                     <div className="relative flex-1">
+                        <input 
+                          type="file" 
+                          name="thumbnailFile" 
+                          accept="image/*"
+                          id="photo-upload"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              const label = document.getElementById('photo-label');
+                              if (label) label.innerText = file.name;
+                            }
+                          }}
+                        />
+                        <label 
+                          htmlFor="photo-upload" 
+                          className="flex items-center gap-3 bg-slate-50 p-4 rounded text-xs border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors"
+                        >
+                          <ImageIcon className="w-4 h-4 text-indigo-600" />
+                          <span id="photo-label" className="text-slate-500 truncate">Pilih Foto (Upload)</span>
+                        </label>
+                     </div>
+                     <div className="flex items-center px-4 text-[10px] font-bold text-slate-300 uppercase">Atau</div>
+                     <input name="thumbnailUrl" placeholder="Link URL Foto" className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none flex-1 border border-slate-100" />
+                   </div>
+                 </div>
+
+                 <button 
+                   type="submit" 
+                   disabled={uploading}
+                   className={cn(
+                     "w-full bg-indigo-900 text-white py-4 rounded font-bold text-xs uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2",
+                     uploading ? "opacity-70 cursor-not-allowed" : "hover:bg-slate-800"
+                   )}
+                 >
+                   {uploading ? (
+                     <>
+                       <Loader2 className="w-4 h-4 animate-spin" /> Sedang Mengunggah...
+                     </>
+                   ) : (
+                     <>
+                       <Upload className="w-4 h-4" /> Simpan Testimoni
+                     </>
+                   )}
+                 </button>
                </form>
              </motion.div>
           </div>
         )}
+
+        {/* Add Announcement Modal */}
+        {isAddingAnnouncement && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
+            <motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="absolute inset-0 bg-[#1A1A1A]/95" 
+               onClick={() => setIsAddingAnnouncement(false)} 
+             />
+              <motion.div 
+               initial={{ y: 50, opacity: 0 }}
+               animate={{ y: 0, opacity: 1 }}
+               exit={{ y: 50, opacity: 0 }}
+               className="relative bg-white w-full max-w-md rounded-xl p-8 border-t-8 border-indigo-900"
+               onClick={(e) => e.stopPropagation()}
+             >
+               <h2 className="text-xl font-bold uppercase tracking-tight text-indigo-900 mb-8">Tambah Informasi Terbaru</h2>
+               <form onSubmit={(e) => {
+                 e.preventDefault();
+                 const formData = new FormData(e.currentTarget);
+                 handleAddAnnouncement(Object.fromEntries(formData));
+               }} className="space-y-4">
+                 <textarea name="content" placeholder="Isi Berita / Pengumuman" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" rows={3} />
+                 <select name="type" className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100">
+                    <option value="Update">Update (Sistem)</option>
+                    <option value="Berita">Berita (Beasiswa)</option>
+                    <option value="Penting">Penting (Mendesak)</option>
+                 </select>
+                 <button type="submit" className="w-full bg-indigo-900 text-white py-4 rounded font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">Terbitkan Berita</button>
+               </form>
+             </motion.div>
+          </div>
+        )}
+
         {(isAddingScholarship || editingScholarship) && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
             <motion.div 
@@ -950,6 +1328,49 @@ export default function App() {
                  <input defaultValue={editingScholarship?.criteria.join(', ')} name="criteria" placeholder="Kriteria (Pisahkan dengan koma: S1, S2, Kedinasan)" className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
                  <textarea defaultValue={editingScholarship?.description} name="description" placeholder="Deskripsi Lengkap & Persyaratan (Markdown supported)" rows={4} className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-indigo-600 outline-none w-full border border-slate-100" />
                  <button type="submit" className="w-full bg-indigo-900 text-white py-4 rounded font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">{editingScholarship ? 'Simpan Perubahan' : 'Terbitkan Informasi'}</button>
+               </form>
+             </motion.div>
+          </div>
+        )}
+        {/* Add/Edit Quick Info Modal */}
+        {(isAddingQuickInfo || editingQuickInfo) && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
+            <motion.div 
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="absolute inset-0 bg-[#1A1A1A]/95" 
+               onClick={() => { setIsAddingQuickInfo(false); setEditingQuickInfo(null); }} 
+             />
+              <motion.div 
+               initial={{ y: 50, opacity: 0 }}
+               animate={{ y: 0, opacity: 1 }}
+               exit={{ y: 50, opacity: 0 }}
+               className="relative bg-white w-full max-w-md rounded-xl p-8 border-t-8 border-amber-500"
+               onClick={(e) => e.stopPropagation()}
+             >
+               <h2 className="text-xl font-bold uppercase tracking-tight text-indigo-900 mb-8">{editingQuickInfo ? 'Edit Kartu Informasi' : 'Tambah Kartu Informasi'}</h2>
+               <form onSubmit={(e) => {
+                 e.preventDefault();
+                 const formData = new FormData(e.currentTarget);
+                 const data = Object.fromEntries(formData);
+                 if (editingQuickInfo) {
+                   handleUpdateQuickInfo(editingQuickInfo.id, data as any);
+                 } else {
+                   handleAddQuickInfo(data as any);
+                 }
+               }} className="space-y-4">
+                 <div className="space-y-1">
+                   <p className="text-[9px] font-bold text-slate-400 uppercase ml-1 tracking-widest">Judul Kartu</p>
+                   <input defaultValue={editingQuickInfo?.title} name="title" placeholder="Contoh: BERLIAN PENDIDIKAN" required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-amber-500 outline-none w-full border border-slate-100 font-bold uppercase" />
+                 </div>
+                 <div className="space-y-1">
+                   <p className="text-[9px] font-bold text-slate-400 uppercase ml-1 tracking-widest">Isi Keterangan</p>
+                   <textarea defaultValue={editingQuickInfo?.content} name="content" placeholder="Masukkan keterangan singkat di sini..." required className="bg-slate-50 p-4 rounded text-xs focus:ring-1 focus:ring-amber-500 outline-none w-full border border-slate-100" rows={4} />
+                 </div>
+                 <button type="submit" className="w-full bg-indigo-900 text-white py-4 rounded font-bold text-xs uppercase tracking-widest hover:bg-slate-800 transition-all shadow-xl">
+                   {editingQuickInfo ? 'Simpan Perubahan' : 'Terbitkan Kartu'}
+                 </button>
                </form>
              </motion.div>
           </div>

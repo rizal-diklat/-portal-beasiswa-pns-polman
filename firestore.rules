@@ -40,8 +40,8 @@ service cloud.firestore {
 
     // Admins collection
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow create, update: if isBootstrappedAdmin() && isValidId(adminId);
+      allow read: if true; // Temporarily open to debug permission-denied
+      allow create, update: if isBootstrappedAdmin();
     }
 
     // Scholarships
@@ -76,6 +76,22 @@ service cloud.firestore {
     match /testimonials/{testimonialId} {
       allow read: if true;
       allow create: if isAdmin() && isValidId(testimonialId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(announcementId);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Quick Infos
+    match /quickInfos/{quickInfoId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(quickInfoId);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

@@ -50,6 +50,30 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "role", "videoUrl"]
+    },
+    "announcement": {
+      "title": "Announcement",
+      "description": "Latest news and updates for the portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["Penting", "Berita", "Update"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["content", "type"]
+    },
+    "quickInfo": {
+      "title": "QuickInfo",
+      "description": "Short informational cards displayed on the sidebar",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content"]
     }
   },
   "firestore": {
@@ -64,6 +88,14 @@
     "/testimonials/{testimonialId}": {
       "schema": "testimonial",
       "description": "Collection of video testimonials"
+    },
+    "/announcements/{announcementId}": {
+      "schema": "announcement",
+      "description": "Latest news and updates"
+    },
+    "/quickInfos/{quickInfoId}": {
+      "schema": "quickInfo",
+      "description": "Informational cards on the sidebar"
     },
     "/admins/{adminId}": {
       "schema": { "type": "object", "properties": { "email": { "type": "string" } } },
