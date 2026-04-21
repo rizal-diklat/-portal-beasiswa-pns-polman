@@ -49,7 +49,8 @@ import {
   where,
   getDocs,
   setDoc,
-  getDoc
+  getDoc,
+  getDocFromServer
 } from 'firebase/firestore';
 import { 
   ref, 
@@ -128,9 +129,26 @@ export default function App() {
   const [isAddingQuickInfo, setIsAddingQuickInfo] = useState(false);
   const [editingQuickInfo, setEditingQuickInfo] = useState<QuickInfo | null>(null);
 
+  const [dbError, setDbError] = useState<string | null>(null);
+
   // --- Auth & Data Fetching ---
 
   useEffect(() => {
+    // Verify connection to the new database
+    const testConnection = async () => {
+      try {
+        console.log("Testing connection to database:", db.app.options.projectId);
+        // Using getDocFromServer to bypass local cache and force a real network request
+        await getDocFromServer(doc(db, '_connection_test', 'check'));
+        console.log("Database connection & permissions check passed (empty but allowed)");
+        setDbError(null);
+      } catch (error: any) {
+        console.error("Database Connection/Permission Test Failed:", error);
+        setDbError(error.message || "Gagal terhubung ke database baru.");
+      }
+    };
+    testConnection();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
@@ -349,7 +367,14 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-indigo-900 text-white border-b-4 border-amber-500 px-6 py-4 flex justify-between items-center shadow-md">
+      <nav className="sticky top-0 z-50 bg-indigo-900 text-white border-b-4 border-amber-500 flex flex-col shadow-md">
+        {dbError && (
+          <div className="bg-red-600 text-white text-[10px] py-1.5 px-6 flex items-center justify-center gap-2 border-b border-indigo-800">
+            <AlertCircle className="w-3 h-3" />
+            Terdeteksi masalah koneksi: {dbError}. Silakan Log Out dan Log In kembali untuk menyegarkan sesi ke proyek baru.
+          </div>
+        )}
+        <div className="px-6 py-4 flex justify-between items-center w-full">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setView('home')}>
           <div className="bg-white/10 backdrop-blur-md p-1.5 rounded-xl border border-white/20 shadow-inner transition-transform group-hover:scale-105">
             <img 
@@ -407,7 +432,7 @@ export default function App() {
               <User className="w-4 h-4" /> Masuk
             </button>
           )}
-        </div>
+        </div></div>
       </nav>
 
       {/* Announcements Marquee */}

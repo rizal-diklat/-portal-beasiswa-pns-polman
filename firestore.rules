@@ -33,15 +33,15 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // Default deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // Default deny - move to the end or simplify
+    // match /{document=**} {
+    //   allow read, write: if false;
+    // }
 
     // Admins collection
     match /admins/{adminId} {
-      allow read: if true; // Temporarily open to debug permission-denied
-      allow create, update: if isBootstrappedAdmin();
+      allow read: if true;
+      allow write: if isBootstrappedAdmin();
     }
 
     // Scholarships
@@ -94,6 +94,10 @@ service cloud.firestore {
       allow create: if isAdmin() && isValidId(quickInfoId);
       allow update: if isAdmin();
       allow delete: if isAdmin();
+    }
+
+    match /_connection_test/{id} {
+      allow read: if true;
     }
   }
 }
